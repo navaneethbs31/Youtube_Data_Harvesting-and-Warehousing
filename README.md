@@ -39,7 +39,9 @@ Libraries used:
 3. streamlit
 4. re
 5. mysql.connector
-6. pymongo
+6. create_engine
+7. pymongo
+8. tabulate
 
 Features : The following functions are available in the YouTube Data Harvesting and Warehousing application:
 
