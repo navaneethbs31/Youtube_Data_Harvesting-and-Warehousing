@@ -43,7 +43,7 @@ Engine = create_engine('mysql+pymysql://root:123456@localhost/youtube_data')
 def Api_Connect():
     api_service_name = "youtube"
     api_version = "v3"
-    api_key = "AIzaSyCMTgOfUW0_wuqsEBF948ijqL0dDp5c54Y"
+    api_key = "xxx"
     youtube = googleapiclient.discovery.build(api_service_name, api_version, developerKey=api_key)
     return youtube
 youtube = Api_Connect()
@@ -206,8 +206,8 @@ def Comments_data(yotube,video_ids):
     return comment_data
 # create a client instance of MongoDB
 # Define your username, password, and cluster address
-username = "navabs"
-password = "123456@nava"
+username = "username"
+password = "password"
 cluster_address = "ac-z5l2sxl-shard-00-00.a4spb07.mongodb.net"
 
 # Encode the username and password
