@@ -381,34 +381,58 @@ if select == "Home":
         st.subheader(":gray[Streamlit]")
 elif select == "Channel Data Scraping":
     st.title(":red[YOUTUBE DATA HARVESTING]")
-    col1,col2 = st.columns(2)
+    tab1,tab2=st.tabs(["Data Collection", "Data Query"])
+# ========================================================= / Data Collection / ===============================================================
+    with tab1:
+        col1,col2 = st.columns(2)
 
-    # Data Collection Zone
-    with col1:
-        st.header(":blue[Data Collection Zone]")
-        st.write(":grey[(Note: This zone collects data by using Channel ID and stores it using **MongoDB**)]")
-        channel_id = st.text_input("**Enter Channel ID**")  # input channel_id
-        st.write(":grey[To get data and store it, click button below  **Get Data and Store**]")
-        if st.button("Get Data and Store",type="primary"):
-            x = youtube_data(channel_id)
-            mongodb(x)
-            st.info("Data stored in MongoDB successfully")
+        # Data Collection Zone
+        with col1:
+            st.header(":blue[Data Collection Zone]")
+            st.write(":grey[(Note: This zone collects data by using Channel ID and stores it using **MongoDB**)]")
+            channel_id = st.text_input("**Enter Channel ID**")  # input channel_id
+            st.write(":grey[To get data and store it, click button below  **Get Data and Store**]")
+            if st.button("Get Data and Store",type="primary"):
+                x = youtube_data(channel_id)
+                mongodb(x)
+                st.info("Data stored in MongoDB successfully")
 
-    # Data Migration Zone
-    with col2:
-        st.header(":blue[Data Migration Zone]")
-        st.write(":gray[Note: Data stored using **MongoDB** will be migrated to **SQL warehouse**")
-        selectbox = st.selectbox("",
-                                 ("Migrate to SQL","Queries")
-                                 )
-        if (selectbox=="Migrate to SQL"):
+        # Data Migration Zone
+        with col2:
+            st.header(":blue[Data Migration Zone]")
+            st.write(":gray[(Note: Data stored using **MongoDB** will be migrated to **SQL warehouse**)]")
             st.write(":gray[To migrate data to sql, click button below **Migrate to SQL**]")
             if st.button("Migrate to SQL",type="primary"):
                 insert_to_SQL(channel_id)
                 databasestructure()
                 st.text("Cool!")
+# ================================================== / Data Query / =================================================================
+
+    with tab2:
+        selectbox = st.selectbox("",
+                                 ("Channel Details", "Queries")
+                                 )
+# ==========================================/ Channel Details / ========================================================
+        if (selectbox=="Channel Details"):
+            st.header(":blue[Channel Data]")
+
+            mycursor.execute("use youtube_data")
+            mycursor.execute("SELECT channel_id from channel")
+            channel_ids=mycursor.fetchall()
+            selected_channel_id=st.selectbox("**Select Channel ID**",channel_ids)
+            st.write(":gray[To get Channel Details, select **Channel ID** from the list]")
+            if selected_channel_id:
+                mycursor.execute("SHOW COLUMNS FROM channel")
+                column_names = [column[0] for column in mycursor.fetchall()]
+                mycursor.execute("SELECT * from channel where channel_id=%s",(selected_channel_id))
+                channel_details=mycursor.fetchone()
+                st.write("Channel Details:")
+                st.table([column_names,channel_details])
+
+
 # ============================================ /  QUESTIONS  / ======================================================
         elif (selectbox=="Queries"):
+            st.header(":blue[Queries]")
             questions = st.selectbox("Questions: ", ["Please select one",
                                                      "What are the names of all the videos and their Corresponding Channels?",
                                                      "Which channels have the most no of videos and how many videos?",
@@ -425,26 +449,26 @@ elif select == "Channel Data Scraping":
                 st.text("Please Choose any one Query")
             elif questions=="What are the names of all the videos and their Corresponding Channels?":
                 mycursor.execute("use youtube_data")
-                mycursor.execute("""select video.video_name,channel.channel_name from video 
-                                 INNER JOIN channel where video.channelid = channel.channel_id """)
+                mycursor.execute("""select videos.video_name,channel.channel_name from videos 
+                                 INNER JOIN channel on videos.channel_id = channel.channel_id """)
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
 
             elif questions=="Which channels have the most no of videos and how many videos?":
                 mycursor.execute("Use youtube_data")
-                mycursor.execute("""Select video.channelid, channel.channel_name, count(video.video_id) 
-                        from video INNER JOIN channel on video.channelid=channel.channel_id 
-                        group by video.channelid""")
+                mycursor.execute("""Select videos.channel_id, channel.channel_name, count(videos.video_id) 
+                        from videos INNER JOIN channel on videos.channel_id=channel.channel_id 
+                        group by videos.channel_id""")
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
 
             elif questions=="What are the top 10 most viewed videos & the respective channels?":
                 mycursor.execute("Use youtube_data")
-                mycursor.execute("""Select video.channelid, channel.channel_name, count(video.video_id) 
-                        from video INNER JOIN channel on video.channelid=channel.channel_id 
-                        group by video.channelid""")
+                mycursor.execute("""SELECT videos.video_name, channel.channel_name, videos.view_count FROM videos
+                                    INNER JOIN channel ON videos.channel_id = channel.channel_id
+                                    ORDER BY videos.view_count DESC LIMIT 10""")
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
@@ -452,7 +476,7 @@ elif select == "Channel Data Scraping":
             elif questions=="How many comments were made on each video & the respective video names?":
                 mycursor.execute("Use youtube_data")
                 mycursor.execute("""select comment_count,video_name 
-                        from video 
+                        from videos 
                         order by comment_count desc""")
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
@@ -460,8 +484,8 @@ elif select == "Channel Data Scraping":
 
             elif questions=="Which videos have the highest number of likes, and what are their corresponding channel names?":
                 mycursor.execute("Use youtube_data")
-                mycursor.execute("""select video.video_name,video.like_count,channel.channel_name 
-                       from video INNER JOIN channel on video.channelid=channel.channel_id 
+                mycursor.execute("""select videos.video_name,videos.like_count,channel.channel_name 
+                       from videos INNER JOIN channel on videos.channel_id=channel.channel_id 
                        order by like_count desc limit 10""")
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
@@ -469,7 +493,7 @@ elif select == "Channel Data Scraping":
 
             elif questions=="What is the total number of likes and dislikes for each video, and what are their corresponding video names?":
                 mycursor.execute("Use youtube_data")
-                mycursor.execute("select like_Count+comment_count as Total, Video_name from video")
+                mycursor.execute("select like_Count+comment_count as Total, Video_name from videos")
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
@@ -483,31 +507,31 @@ elif select == "Channel Data Scraping":
 
             elif questions=="What are the names of all the channels that have published videos in the year 2022?":
                 mycursor.execute("Use youtube_data")
-                mycursor.execute("""select video.video_name, video.publishedAt, channel.channel_name 
-                        from video INNER JOIN channel on video.channelid=channel.channel_id 
-                        where publishedAt between '2019-12-31 23:59:59' and '2021-01-01 12:00:00'
-                        """)
+                mycursor.execute("""SELECT DISTINCT channel.channel_name,videos.video_name, videos.published_At FROM videos 
+                        INNER JOIN channel ON videos.channel_id = channel.channel_id 
+                        WHERE YEAR(videos.published_At) = 2022 """)
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
 
             elif questions=="What is the average duration of all videos in each channel, and what are their corresponding channel names?":
                 mycursor.execute("Use youtube_data")
-                mycursor.execute("""select  channel.channel_name, video.channelid, avg(video.duration) as Avg 
-                        from video INNER JOIN channel on video.channelid=channel.channel_id
-                        group by video.channelid""")
+                mycursor.execute("""select  channel.channel_name, videos.channel_id, avg(videos.duration) as AvgDuration
+                        from videos INNER JOIN channel on videos.channel_id=channel.channel_id
+                        group by videos.channel_id""")
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
 
             elif questions=="Which videos have the highest number of comments, and what are their corresponding channel names?":
                 mycursor.execute("Use youtube_data")
-                mycursor.execute("""select video.video_name,video.comment_count,channel.channel_name 
-                        from video INNER JOIN channel on video.channelid=channel.channel_id 
+                mycursor.execute("""select videos.video_name,videos.comment_count,channel.channel_name 
+                        from videos INNER JOIN channel on videos.channel_id=channel.channel_id 
                         order by comment_count desc limit 10""")
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
+                
 
 
 
