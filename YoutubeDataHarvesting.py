@@ -324,6 +324,14 @@ def insert_to_SQL(channel_id):
     except:
         pass
 
+def fetch_channel_ids():
+    db = client['projects']  # Replace 'your_database_name' with your actual database name
+    collection = db['youtube_data']  # Replace 'youtube_data' with your actual collection name
+    cursor = collection.find({}, {'Channel_id': 1})  # Fetch only the Channel_id field
+    channel_ids = [doc['Channel_id'] for doc in cursor]
+    return channel_ids
+
+
 # Function to create channel,playlist,video,comment table
 def databasestructure():
     try:
@@ -401,11 +409,27 @@ elif select == "Channel Data Scraping":
         with col2:
             st.header(":blue[Data Migration Zone]")
             st.write(":gray[(Note: Data stored using **MongoDB** will be migrated to **SQL warehouse**)]")
-            st.write(":gray[To migrate data to sql, click button below **Migrate to SQL**]")
+            st.write(":gray[To migrate data to sql, select the **Channel ID** and click button below **Migrate to SQL**]")
+            #st.write("Select the channel IDs you want to migrate:")
+            channel_ids = fetch_channel_ids()
+            selected_channel_id = st.selectbox("Select Channel ID", channel_ids)
             if st.button("Migrate to SQL",type="primary"):
-                insert_to_SQL(channel_id)
-                databasestructure()
-                st.text("Cool!")
+                if selected_channel_id:
+                    try:
+                        mycursor.execute("use youtube_data")
+                        mycursor.execute("SELECT channel_id FROM channel WHERE channel_id = %s", (selected_channel_id,))
+                        result = mycursor.fetchone()
+                        if result:
+                            st.text("Channel Data Already Exists")
+                        else:
+                            insert_to_SQL(selected_channel_id)
+                            databasestructure()
+                            st.text("Cool!")
+
+                    except Exception as e:
+                        st.error(f"Error: {e}")
+                else:
+                    st.warning("Please select at least one channel ID to migrate.")
 # ================================================== / Data Query / =================================================================
 
     with tab2:
@@ -417,14 +441,14 @@ elif select == "Channel Data Scraping":
             st.header(":blue[Channel Data]")
 
             mycursor.execute("use youtube_data")
-            mycursor.execute("SELECT channel_id from channel")
-            channel_ids=mycursor.fetchall()
-            selected_channel_id=st.selectbox("**Select Channel ID**",channel_ids)
-            st.write(":gray[To get Channel Details, select **Channel ID** from the list]")
-            if selected_channel_id:
+            mycursor.execute("SELECT channel_name from channel")
+            channel_name=mycursor.fetchall()
+            selected_channel_name=st.selectbox("**Select Channel Name**",channel_name)
+            st.write(":gray[To get Channel Details, select **Channel Name** from the list]")
+            if selected_channel_name:
                 mycursor.execute("SHOW COLUMNS FROM channel")
                 column_names = [column[0] for column in mycursor.fetchall()]
-                mycursor.execute("SELECT * from channel where channel_id=%s",(selected_channel_id))
+                mycursor.execute("SELECT * from channel where channel_name=%s",(selected_channel_name))
                 channel_details=mycursor.fetchone()
                 st.write("Channel Details:")
                 st.table([column_names,channel_details])
@@ -531,6 +555,7 @@ elif select == "Channel Data Scraping":
                 out = mycursor.fetchall()
                 a = tabulate(out, headers=[i[0] for i in mycursor.description], tablefmt='psql')
                 st.text("{}".format(a))
+
                 
 
 
